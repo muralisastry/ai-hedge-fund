@@ -2,6 +2,7 @@ import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 import { Cloud, RefreshCw } from 'lucide-react';
 import { useEffect, useState } from 'react';
+import { API_BASE_URL } from '@/lib/api-base';
 
 interface CloudModelsProps {
   className?: string;
@@ -30,7 +31,7 @@ export function CloudModels({ className }: CloudModelsProps) {
     setLoading(true);
     setError(null);
     try {
-      const response = await fetch('http://localhost:8000/language-models/providers');
+      const response = await fetch(`${API_BASE_URL}/language-models/providers`);
       if (response.ok) {
         const data = await response.json();
         setProviders(data.providers);

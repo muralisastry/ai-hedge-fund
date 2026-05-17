@@ -87,34 +87,11 @@ check_prerequisites() {
         missing_deps+=("Python 3 (https://python.org/)")
     fi
     
-    # Check for Poetry - offer to install if missing
-    if ! command_exists poetry; then
-        print_warning "Poetry is not installed."
-        print_status "Poetry is required to manage Python dependencies for this project."
-        echo ""
-        read -p "Would you like to install Poetry automatically? (y/N): " -n 1 -r
-        echo ""
-        if [[ $REPLY =~ ^[Yy]$ ]]; then
-            print_status "Installing Poetry..."
-            if python3 -m pip install poetry; then
-                print_success "Poetry installed successfully!"
-                print_status "Refreshing environment..."
-                # Try to refresh the PATH for this session
-                export PATH="$HOME/.local/bin:$PATH"
-                if ! command_exists poetry; then
-                    print_warning "Poetry may not be in PATH. You might need to restart your terminal."
-                    print_warning "Alternatively, try: source ~/.bashrc or source ~/.zshrc"
-                fi
-            else
-                print_error "Failed to install Poetry automatically."
-                print_error "Please install Poetry manually from https://python-poetry.org/"
-                exit 1
-            fi
-        else
-            missing_deps+=("Poetry (https://python-poetry.org/)")
-        fi
+    # Check that python3 can create virtual environments (stdlib venv)
+    if command_exists python3 && ! python3 -c "import venv" >/dev/null 2>&1; then
+        missing_deps+=("python3-venv (the Python venv module)")
     fi
-    
+
     if [[ ${#missing_deps[@]} -gt 0 ]]; then
         print_error "Missing required dependencies:"
         for dep in "${missing_deps[@]}"; do
@@ -172,25 +149,33 @@ setup_database() {
 # Function to install backend dependencies
 install_backend() {
     print_status "Installing backend dependencies..."
-    
-    cd backend
-    
+
+    # The project lives in the repo root (parent of app/); use a local .venv
+    # to match the convention used by the other quantai apps.
+    cd ..
+
+    if [[ ! -x ".venv/bin/python" ]]; then
+        print_status "Creating virtual environment (.venv)..."
+        python3 -m venv .venv
+    fi
+
     # Check if dependencies are actually installed and working
-    if poetry run python -c "import uvicorn; import fastapi" >/dev/null 2>&1; then
+    if .venv/bin/python -c "import uvicorn; import fastapi" >/dev/null 2>&1; then
         print_success "Backend dependencies already installed!"
     else
-        print_status "Installing Python dependencies with Poetry..."
-        poetry install
-        if poetry run python -c "import uvicorn; import fastapi" >/dev/null 2>&1; then
+        print_status "Installing Python dependencies into .venv..."
+        .venv/bin/pip install -U pip >/dev/null
+        .venv/bin/pip install -e ".[dev]"
+        if .venv/bin/python -c "import uvicorn; import fastapi" >/dev/null 2>&1; then
             print_success "Backend dependencies installed!"
         else
             print_error "Failed to install backend dependencies properly"
-            print_error "Try running: cd backend && poetry install --sync"
+            print_error "Try running: python3 -m venv .venv && .venv/bin/pip install -e \".[dev]\""
             exit 1
         fi
     fi
-    
-    cd ..
+
+    cd app
 }
 
 # Function to install frontend dependencies
@@ -250,7 +235,7 @@ start_services() {
     print_status "Starting backend server..."
     # Run from the app directory (parent of backend) to ensure proper Python imports
     cd ..
-    poetry run uvicorn app.backend.main:app --reload --host 127.0.0.1 --port 8000 > "$LOG_DIR/backend.log" 2>&1 &
+    .venv/bin/uvicorn app.backend.main:app --reload --host 127.0.0.1 --port 8006 > "$LOG_DIR/backend.log" 2>&1 &
     BACKEND_PID=$!
     cd app
     
@@ -299,15 +284,15 @@ start_services() {
     # Open browser after frontend is running
     print_status "Opening web browser..."
     sleep 2  # Give frontend a moment to fully start
-    open_browser "http://localhost:5173"
-    
+    open_browser "http://localhost:5177"
+
     echo ""
     print_success "🚀 AI Hedge Fund web application is now running!"
-    print_success "🌐 Browser should open automatically to http://localhost:5173"
+    print_success "🌐 Browser should open automatically to http://localhost:5177"
     echo ""
-    print_status "Frontend (Web Interface): http://localhost:5173"
-    print_status "Backend (API): http://localhost:8000"
-    print_status "API Documentation: http://localhost:8000/docs"
+    print_status "Frontend (Web Interface): http://localhost:5177"
+    print_status "Backend (API): http://localhost:8006"
+    print_status "API Documentation: http://localhost:8006/docs"
     print_status "Database: SQLite (hedge_fund.db in project root)"
     echo ""
     print_status "Press Ctrl+C to stop both services"
@@ -355,21 +340,23 @@ if [[ "$1" == "--help" ]] || [[ "$1" == "-h" ]]; then
     echo "Usage: ./run.sh"
     echo ""
     echo "This script will:"
-    echo "  1. Check for required dependencies (Node.js, npm, Python, Poetry)"
-    echo "  2. Install backend dependencies using Poetry"
+    echo "  1. Check for required dependencies (Node.js, npm, Python 3 + venv)"
+    echo "  2. Create a .venv and install backend dependencies with pip"
     echo "  3. Install frontend dependencies using npm"
     echo "  4. Start both the backend API server and frontend development server"
     echo "  5. Automatically initialize SQLite database on first run"
     echo ""
+    echo "Note: this app is also registered with the quantai orchestrator."
+    echo "      You can alternatively run it with: quantai start hedgefund"
+    echo ""
     echo "Requirements:"
     echo "  - Node.js and npm (https://nodejs.org/)"
-    echo "  - Python 3 (https://python.org/)"
-    echo "  - Poetry (https://python-poetry.org/)"
+    echo "  - Python 3 with the venv module (https://python.org/)"
     echo ""
     echo "After running, you can access:"
-    echo "  - Frontend: http://localhost:5173"
-    echo "  - Backend API: http://localhost:8000"
-    echo "  - API Docs: http://localhost:8000/docs"
+    echo "  - Frontend: http://localhost:5177"
+    echo "  - Backend API: http://localhost:8006"
+    echo "  - API Docs: http://localhost:8006/docs"
     echo "  - Database: SQLite file (hedge_fund.db) in project root"
     echo ""
     exit 0
