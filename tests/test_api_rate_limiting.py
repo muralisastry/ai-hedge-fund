@@ -1,14 +1,16 @@
 import os
+from unittest.mock import call, Mock, patch
+
 import pytest
-from unittest.mock import Mock, patch, call
 
 from src.tools.api import _make_api_request, get_prices
+
 
 class TestRateLimiting:
     """Test suite for API rate limiting functionality."""
 
-    @patch('src.tools.api.time.sleep')
-    @patch('src.tools.api.requests.get')
+    @patch('src.tools.providers.financialdatasets.time.sleep')
+    @patch('src.tools.providers.financialdatasets.requests.get')
     def test_handles_single_rate_limit(self, mock_get, mock_sleep):
         """Test that API retries once after a 429 and succeeds."""
         # Setup mock responses: first 429, then 200
@@ -41,8 +43,8 @@ class TestRateLimiting:
         # Verify sleep was called once with 60 seconds (first retry)
         mock_sleep.assert_called_once_with(60)
 
-    @patch('src.tools.api.time.sleep')
-    @patch('src.tools.api.requests.get')
+    @patch('src.tools.providers.financialdatasets.time.sleep')
+    @patch('src.tools.providers.financialdatasets.requests.get')
     def test_handles_multiple_rate_limits(self, mock_get, mock_sleep):
         """Test that API retries multiple times after 429s."""
         # Setup mock responses: three 429s, then 200
@@ -78,8 +80,8 @@ class TestRateLimiting:
         expected_calls = [call(60), call(90), call(120)]
         mock_sleep.assert_has_calls(expected_calls)
 
-    @patch('src.tools.api.time.sleep')
-    @patch('src.tools.api.requests.post')
+    @patch('src.tools.providers.financialdatasets.time.sleep')
+    @patch('src.tools.providers.financialdatasets.requests.post')
     def test_handles_post_rate_limiting(self, mock_post, mock_sleep):
         """Test that POST requests handle rate limiting."""
         # Setup mock responses: first 429, then 200
@@ -113,8 +115,8 @@ class TestRateLimiting:
         # Verify sleep was called once with 60 seconds (first retry)
         mock_sleep.assert_called_once_with(60)
 
-    @patch('src.tools.api.time.sleep')
-    @patch('src.tools.api.requests.get')
+    @patch('src.tools.providers.financialdatasets.time.sleep')
+    @patch('src.tools.providers.financialdatasets.requests.get')
     def test_ignores_other_errors(self, mock_get, mock_sleep):
         """Test that non-429 errors are returned without retrying."""
         # Setup mock response: 500 error
@@ -140,8 +142,8 @@ class TestRateLimiting:
         # Verify sleep was never called
         mock_sleep.assert_not_called()
 
-    @patch('src.tools.api.time.sleep')
-    @patch('src.tools.api.requests.get')
+    @patch('src.tools.providers.financialdatasets.time.sleep')
+    @patch('src.tools.providers.financialdatasets.requests.get')
     def test_normal_success_requests(self, mock_get, mock_sleep):
         """Test that successful requests return immediately without retry."""
         # Setup mock response: 200 success
@@ -167,9 +169,9 @@ class TestRateLimiting:
         # Verify sleep was never called
         mock_sleep.assert_not_called()
 
-    @patch('src.tools.api._cache')
-    @patch('src.tools.api.time.sleep')
-    @patch('src.tools.api.requests.get')
+    @patch('src.tools.providers.financialdatasets._cache')
+    @patch('src.tools.providers.financialdatasets.time.sleep')
+    @patch('src.tools.providers.financialdatasets.requests.get')
     def test_full_integration(self, mock_get, mock_sleep, mock_cache):
         """Test that get_prices function properly handles rate limiting."""
         # Mock cache to return None (cache miss)
@@ -215,8 +217,8 @@ class TestRateLimiting:
         mock_cache.get_prices.assert_called_once()
         mock_cache.set_prices.assert_called_once()
 
-    @patch('src.tools.api.time.sleep')
-    @patch('src.tools.api.requests.get')
+    @patch('src.tools.providers.financialdatasets.time.sleep')
+    @patch('src.tools.providers.financialdatasets.requests.get')
     def test_max_retries_exceeded(self, mock_get, mock_sleep):
         """Test that function stops retrying after max_retries and returns final 429."""
         # Setup mock responses: all 429s (exceeds max retries)
