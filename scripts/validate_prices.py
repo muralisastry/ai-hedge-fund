@@ -53,6 +53,12 @@ def _yf_prices(ticker: str):
 
 
 def main() -> int:
+    # The internal provider needs QUANTAI_MARKETDATA_DB_URL, which lives in
+    # .env (not the shell env) — load it before any provider import/call.
+    from dotenv import load_dotenv
+
+    load_dotenv()
+
     ap = argparse.ArgumentParser(description="Validate internal-provider prices against yfinance.")
     ap.add_argument("--tickers", nargs="+", default=DEFAULT_TICKERS)
     ap.add_argument("--tolerance", type=float, default=0.02, help="relative tolerance (default 0.02 = 2 pct)")

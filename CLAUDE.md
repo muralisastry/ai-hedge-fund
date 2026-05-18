@@ -20,7 +20,9 @@ matching the convention of the sibling apps under `~/quantai-trading/`.
 ```bash
 # One-time setup
 python3.11 -m venv .venv
-.venv/bin/pip install -e ".[dev]"           # install incl. dev extras
+.venv/bin/pip install -e ".[dev]"                       # install incl. dev extras
+.venv/bin/pip install -e ~/quantai-trading/quantai-market-data  # shared data layer (prices + fundamentals)
+# Then set QUANTAI_MARKETDATA_DB_URL in .env (shared Postgres DSN).
 
 # Run the v1 hedge fund (CLI)
 .venv/bin/python src/main.py --ticker AAPL,MSFT,NVDA
@@ -68,7 +70,7 @@ Key concepts:
 - **State** (`src/graph/state.py`): `AgentState` is a TypedDict with `messages`, `data`, `metadata`. `data` and `metadata` use merge reducers, so parallel analyst nodes each write into shared `data["analyst_signals"]` without clobbering each other.
 - **Agent registry** (`src/utils/analysts.py`): `ANALYST_CONFIG` is the _single source of truth_. To add an analyst: create `src/agents/<name>.py` exposing a `def <name>_agent(state, agent_id=...)` that returns updated state, then add an entry to `ANALYST_CONFIG`. Node names, CLI menus, and API listings are all derived from this dict — do not wire agents into the graph manually elsewhere.
 - **Agent shape**: each agent fetches data, builds a Pydantic signal model (`signal`/`confidence`/`reasoning`), and calls the LLM. See `src/agents/warren_buffett.py` as the canonical example.
-- **Data layer**: `src/tools/api.py` keeps stable signatures but delegates to `src/tools/providers/` — a provider-routed layer (`router.py` + `config.py`) that picks a source per data type from `DATA_PROVIDER`/`DATA_PROVIDER_<TYPE>` env, with automatic Financial Datasets fallback. Providers: `financialdatasets` (baseline/fallback), `internal` (shared `quantai-market-data` Postgres + Polygon + the new `quantai_market_data.fundamentals` submodule), `polygon` (news, financials vX), `sec_edgar` (Form 4 insider, companyfacts), `metrics` (ratios computed locally via `_derive.py`). In-memory cache `src/data/cache.py`; Pydantic contracts in `src/data/models.py` are unchanged. Migration plan + status: see the `fd-migration-state` memory; validate with `scripts/data_parity.py` / `scripts/validate_prices.py` before flipping a type's default off `fd`.
+- **Data layer**: `src/tools/api.py` keeps stable signatures but delegates to `src/tools/providers/` — a provider-routed layer (`router.py` + `config.py`) selecting a source per data type from `DATA_PROVIDER`/`DATA_PROVIDER_<TYPE>` env. **Default is `internal`** (the shared `quantai-market-data` Postgres: Polygon-backed prices/market-cap + the `quantai_market_data.fundamentals` submodule for financials/news/insider, derived ratios via `_derive.py`). Financial Datasets is **retired** (`financialdatasets` provider remains only if a key is explicitly set; `DATA_PROVIDER_FALLBACK_FD=false`). Other providers: `polygon` (news, financials vX), `sec_edgar` (Form 4 insider, companyfacts), `metrics` (local ratios). Requires `pip install -e ~/quantai-trading/quantai-market-data` + `QUANTAI_MARKETDATA_DB_URL` (see setup). In-memory cache `src/data/cache.py`; Pydantic contracts in `src/data/models.py` unchanged. Status/known limits (e.g. historical market cap): `fd-migration-state` memory; `scripts/validate_prices.py` cross-checks prices vs yfinance.
 - **LLM layer**: all model calls go through `src/utils/llm.py` `call_llm`. Available models are declared in `src/llm/api_models.json` / `ollama_models.json` and loaded via `src/llm/models.py`.
 - **API keys**: resolve via `src/utils/api_key.py` `get_api_key_from_state` — the web app passes keys through `AgentState`, so do not read `os.environ` directly in agents. At least one LLM provider key plus `FINANCIAL_DATASETS_API_KEY` is required (`.env`, copied from `.env.example`).
 

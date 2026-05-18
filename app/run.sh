@@ -160,13 +160,16 @@ install_backend() {
     fi
 
     # Check if dependencies are actually installed and working
-    if .venv/bin/python -c "import uvicorn; import fastapi" >/dev/null 2>&1; then
+    if .venv/bin/python -c "import uvicorn; import fastapi; import quantai_market_data" >/dev/null 2>&1; then
         print_success "Backend dependencies already installed!"
     else
         print_status "Installing Python dependencies into .venv..."
         .venv/bin/pip install -U pip >/dev/null
         .venv/bin/pip install -e ".[dev]"
-        if .venv/bin/python -c "import uvicorn; import fastapi" >/dev/null 2>&1; then
+        # Shared suite data layer (prices + fundamentals); same convention as
+        # the other quantai apps. Sibling path relative to the repo root.
+        .venv/bin/pip install -e ../quantai-market-data
+        if .venv/bin/python -c "import uvicorn; import fastapi; import quantai_market_data" >/dev/null 2>&1; then
             print_success "Backend dependencies installed!"
         else
             print_error "Failed to install backend dependencies properly"

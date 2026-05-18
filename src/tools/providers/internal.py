@@ -144,12 +144,24 @@ class InternalProvider:
     # Fundamentals from the shared layer (Phase 5 — one source of truth)
     # ------------------------------------------------------------------
 
+    @staticmethod
+    def _read_financials(f, ticker: str, period: str, limit: int):
+        """Read raw financials for *period*; fall back to the canonical
+        ``annual`` series when the requested period has no rows (the shared
+        ingester stores annual; agents typically request ``ttm``). Returns
+        ``(records, effective_period)``."""
+        recs = f.read_financials(ticker, period=period, limit=limit)
+        if not recs and period != "annual":
+            recs = f.read_financials(ticker, period="annual", limit=limit)
+            return recs, "annual"
+        return recs, period
+
     def search_line_items(self, ticker: str, line_items: list[str], end_date: str, period: str = "ttm", limit: int = 10, api_key: str | None = None) -> list[LineItem]:
         f = _fundamentals()
         if f is None:
             return []
         try:
-            recs = f.read_financials(ticker, period=period, limit=limit)
+            recs, eff = self._read_financials(f, ticker, period, limit)
         except Exception as e:
             logger.warning("internal search_line_items failed for %s: %s", ticker, e)
             return []
@@ -158,10 +170,10 @@ class InternalProvider:
             if rec.get("report_period", "9999") > end_date:
                 continue
             _derive.enrich_raw(rec)
-            payload = {"ticker": ticker, "report_period": rec["report_period"], "period": period, "currency": rec.get("currency", "USD")}
+            payload = {"ticker": ticker, "report_period": rec["report_period"], "period": eff, "currency": rec.get("currency", "USD")}
             for name in line_items:
                 if name == "annual":
-                    payload["annual"] = period == "annual"
+                    payload["annual"] = eff == "annual"
                 elif name in rec and not name.startswith("_"):
                     payload[name] = rec[name]
             out.append(LineItem(**payload))
@@ -172,7 +184,8 @@ class InternalProvider:
         if f is None:
             return []
         try:
-            recs = [r for r in f.read_financials(ticker, period=period, limit=limit + 1) if r.get("report_period", "9999") <= end_date]
+            raw, eff = self._read_financials(f, ticker, period, limit + 1)
+            recs = [r for r in raw if r.get("report_period", "9999") <= end_date]
         except Exception as e:
             logger.warning("internal get_financial_metrics failed for %s: %s", ticker, e)
             return []
@@ -189,7 +202,7 @@ class InternalProvider:
         for i, cur in enumerate(recs[:limit]):
             prev = recs[i + 1] if i + 1 < len(recs) else None
             m = _derive.compute_metrics(cur, prev, price, market_cap)
-            out.append(FinancialMetrics(ticker=ticker, report_period=cur.get("report_period", end_date), period=period, currency=cur.get("currency", "USD"), **m))
+            out.append(FinancialMetrics(ticker=ticker, report_period=cur.get("report_period", end_date), period=eff, currency=cur.get("currency", "USD"), **m))
         return out
 
     def get_insider_trades(self, ticker: str, end_date: str, start_date: str | None = None, limit: int = 1000, api_key: str | None = None) -> list[InsiderTrade]:
