@@ -97,7 +97,11 @@ class SECEdgarProvider:
             if start_date and fdate < start_date:
                 break  # recent[] is newest-first; older than window -> stop
             a = accn.replace("-", "")
-            url = f"https://www.sec.gov/Archives/edgar/data/{cik_int}/{a}/{doc}"
+            # primaryDocument is the XSL-rendered HTML viewer (e.g.
+            # "xslF345X06/form4.xml"); the raw ownershipDocument XML is the
+            # same basename at the accession root.
+            raw_doc = doc.rsplit("/", 1)[-1] if "/" in doc else doc
+            url = f"https://www.sec.gov/Archives/edgar/data/{cik_int}/{a}/{raw_doc}"
             out.extend(self._parse_form4(url, ticker, fdate))
             if len(out) >= limit:
                 break

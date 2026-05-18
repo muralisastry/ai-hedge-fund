@@ -217,6 +217,33 @@ def test_sec_form4_parse(monkeypatch):
     assert t.shares_owned_after_transaction == 900.0
 
 
+def test_sec_insider_strips_xsl_viewer_path(monkeypatch):
+    """Regression: primaryDocument is the XSL HTML viewer; the raw
+    ownershipDocument XML is the same basename at the accession root."""
+    from src.tools.providers import sec_edgar as sec
+
+    monkeypatch.setattr(sec, "_cik_cache", {"AAPL": "0000320193"})
+    subs = {
+        "filings": {
+            "recent": {
+                "form": ["4"],
+                "filingDate": ["2024-03-04"],
+                "accessionNumber": ["0001140361-24-000123"],
+                "primaryDocument": ["xslF345X06/form4.xml"],
+            }
+        }
+    }
+    monkeypatch.setattr(sec, "get_json", lambda url, **k: subs if "submissions" in url else None)
+    seen = {}
+    monkeypatch.setattr(
+        sec.SECEdgarProvider, "_parse_form4",
+        lambda self, url, t, d: seen.setdefault("url", url) or [],
+    )
+    sec.SECEdgarProvider().get_insider_trades("AAPL", "2026-05-15", start_date="2024-01-01")
+    assert seen["url"].endswith("/000114036124000123/form4.xml")
+    assert "xslF345X06" not in seen["url"]
+
+
 # --------------------------------------------------------------------------
 # Metrics provider — composition (raw fetch + price mocked)
 # --------------------------------------------------------------------------
