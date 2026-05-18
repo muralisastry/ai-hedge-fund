@@ -275,3 +275,50 @@ def test_metrics_provider_composes(monkeypatch):
     assert out[0].ticker == "AAPL"
     assert out[0].return_on_equity == pytest.approx(0.3)
     assert out[0].revenue_growth == pytest.approx(0.2)
+
+
+def test_metrics_ttm_growth_overlay(monkeypatch):
+    """ttm yields a single snapshot (no prior period); growth must be
+    overlaid from the two latest annual statements (the TTM-growth fix)."""
+    from src.tools.providers import metrics as met
+
+    ttm_row = _derive.enrich_raw({
+        "report_period": "2026-03-28", "currency": "USD", "revenue": 451000.0,
+        "net_income": 100000.0, "total_assets": 360000.0, "shareholders_equity": 66000.0,
+        "earnings_per_share": 6.5, "outstanding_shares": 15000.0,
+    })
+    annual_rows = [
+        _derive.enrich_raw({"report_period": "2025-09-27", "currency": "USD",
+                            "revenue": 416000.0, "net_income": 94000.0,
+                            "shareholders_equity": 57000.0, "earnings_per_share": 6.0,
+                            "operating_income": 123000.0}),
+        _derive.enrich_raw({"report_period": "2024-09-28", "currency": "USD",
+                            "revenue": 391000.0, "net_income": 88000.0,
+                            "shareholders_equity": 50000.0, "earnings_per_share": 5.6,
+                            "operating_income": 114000.0}),
+    ]
+
+    def fake_raw(self, ticker, end_date, period, limit, api_key):
+        return [ttm_row] if period == "ttm" else annual_rows
+
+    monkeypatch.setattr(met.MetricsProvider, "_raw_records", fake_raw)
+
+    class _Internal:
+        def get_prices(self, *a, **k):
+            return []
+
+        def get_market_cap(self, *a, **k):
+            return None
+
+    monkeypatch.setattr("src.tools.providers.internal.InternalProvider", _Internal)
+
+    out = met.MetricsProvider().get_financial_metrics("AAPL", "2026-05-15", period="ttm", limit=10)
+    assert len(out) == 1  # ttm = single snapshot
+    r = out[0]
+    assert r.report_period == "2026-03-28"
+    # Levels from the ttm snapshot:
+    assert r.net_margin == pytest.approx(100000.0 / 451000.0)
+    # Growth overlaid from annual YoY (416000 vs 391000):
+    assert r.revenue_growth == pytest.approx((416000.0 - 391000.0) / 391000.0)
+    assert r.earnings_growth == pytest.approx((94000.0 - 88000.0) / 88000.0)
+    assert r.operating_income_growth == pytest.approx((123000.0 - 114000.0) / 114000.0)

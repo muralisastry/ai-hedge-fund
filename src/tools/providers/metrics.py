@@ -51,10 +51,24 @@ class MetricsProvider:
         except Exception as e:
             logger.debug("price/market_cap unavailable for %s: %s", ticker, e)
 
+        # Polygon's `timeframe=ttm` returns a single snapshot with no prior
+        # period, so consecutive-record growth is impossible. Derive YoY growth
+        # from the two latest *annual* statements and overlay it (this is also
+        # how FD's TTM growth effectively behaves).
+        growth_overlay: dict = {}
+        if period == "ttm":
+            annual = self._raw_records(ticker, end_date, "annual", 2, api_key)
+            if len(annual) >= 2:
+                g = _derive.compute_metrics(annual[0], annual[1], None, None)
+                growth_overlay = {k: g.get(k) for k in _derive.GROWTH_FIELDS}
+
         out: list[FinancialMetrics] = []
         for i, cur in enumerate(rows[:limit]):
             prev = rows[i + 1] if i + 1 < len(rows) else None
             m = _derive.compute_metrics(cur, prev, price, market_cap)
+            for k, v in growth_overlay.items():
+                if m.get(k) is None and v is not None:
+                    m[k] = v
             out.append(
                 FinancialMetrics(
                     ticker=ticker,

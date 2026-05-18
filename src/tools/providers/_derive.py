@@ -113,6 +113,19 @@ METRIC_FIELDS = (
 )
 
 
+# Period-over-period growth fields (subset of METRIC_FIELDS). Used to overlay
+# YoY growth onto a TTM snapshot, which has no prior period of its own.
+GROWTH_FIELDS = (
+    "revenue_growth",
+    "earnings_growth",
+    "book_value_growth",
+    "earnings_per_share_growth",
+    "free_cash_flow_growth",
+    "operating_income_growth",
+    "ebitda_growth",
+)
+
+
 def compute_metrics(cur: dict, prev: Optional[dict], price: Num, market_cap: Num) -> dict:
     """Build a FinancialMetrics-shaped dict from a raw record (+ prior for growth)."""
     g = cur.get
