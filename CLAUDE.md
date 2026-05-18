@@ -20,7 +20,9 @@ matching the convention of the sibling apps under `~/quantai-trading/`.
 ```bash
 # One-time setup
 python3.11 -m venv .venv
-.venv/bin/pip install -e ".[dev]"           # install incl. dev extras
+.venv/bin/pip install -e ".[dev]"                       # install incl. dev extras
+.venv/bin/pip install -e ~/quantai-trading/quantai-market-data  # shared data layer (prices + fundamentals)
+# Then set QUANTAI_MARKETDATA_DB_URL in .env (shared Postgres DSN).
 
 # Run the v1 hedge fund (CLI)
 .venv/bin/python src/main.py --ticker AAPL,MSFT,NVDA
