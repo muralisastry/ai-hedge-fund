@@ -5,18 +5,11 @@ WORKDIR /app
 # Set PYTHONPATH to include the app directory
 ENV PYTHONPATH=/app
 
-# Install Poetry
-RUN pip install poetry==1.7.1
-
-# Copy only dependency files first for better caching
-COPY pyproject.toml poetry.lock* /app/
-
-# Configure Poetry to not use a virtual environment
-RUN poetry config virtualenvs.create false \
-    && poetry install --no-interaction --no-ansi
-
-# Copy rest of the source code
+# Copy the source code (setuptools needs the packages present to build)
 COPY . /app/
 
+# Install the project and its dependencies (PEP 621 / setuptools)
+RUN pip install --no-cache-dir .
+
 # Default command (will be overridden by Docker Compose)
-CMD ["python", "src/main.py"] 
+CMD ["python", "src/main.py"]
