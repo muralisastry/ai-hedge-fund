@@ -102,8 +102,51 @@ current_dir = Path(__file__).parent
 models_json_path = current_dir / "api_models.json"
 ollama_models_json_path = current_dir / "ollama_models.json"
 
-# Load available models from JSON
-AVAILABLE_MODELS = load_models_from_json(str(models_json_path))
+
+# Providers this app can actually construct in get_model(), keyed by the
+# shared catalog's provider display name.
+_SHARED_CATALOG_PROVIDERS = {
+    "OpenAI": ModelProvider.OPENAI,
+    "Anthropic": ModelProvider.ANTHROPIC,
+    "Google": ModelProvider.GOOGLE,
+    "xAI": ModelProvider.XAI,
+    "DeepSeek": ModelProvider.DEEPSEEK,
+    "Kimi": ModelProvider.KIMI,
+}
+
+
+def _models_from_shared_catalog() -> List[LLMModel] | None:
+    """Guarded read of the shared QuantAI catalog (~/.quantai/llm/catalog.json).
+
+    Returns None on ANY failure (quantai-core not installed, file missing or
+    invalid) so the bundled api_models.json stays the fallback. Ollama models
+    keep coming from ollama_models.json; providers this app cannot construct
+    (e.g. GLM, Alibaba/DashScope) are skipped.
+    """
+    try:
+        from quantai_core.llm_config import load_catalog
+
+        catalog = load_catalog()
+        models: List[LLMModel] = []
+        for entry in catalog["models"]:
+            display = (catalog["providers"].get(entry["provider"]) or {}).get("display", "")
+            provider = _SHARED_CATALOG_PROVIDERS.get(display)
+            if provider is None:
+                continue
+            models.append(
+                LLMModel(
+                    display_name=entry.get("display") or entry["id"],
+                    model_name=entry["id"],
+                    provider=provider,
+                )
+            )
+        return models or None
+    except Exception:
+        return None
+
+
+# Load available models: shared QuantAI catalog first, bundled JSON as fallback
+AVAILABLE_MODELS = _models_from_shared_catalog() or load_models_from_json(str(models_json_path))
 
 # Load Ollama models from JSON
 OLLAMA_MODELS = load_models_from_json(str(ollama_models_json_path))
