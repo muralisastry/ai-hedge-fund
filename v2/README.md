@@ -7,12 +7,12 @@ v2 is a ground-up rebuild of the AI hedge fund's core engine, replacing personal
 ## Architecture
 
 ```
-Data (FD API) → Signals → Features → Portfolio Construction → Risk Management → Execution
+Data (internal warehouse / FD API) → Signals → Features → Portfolio Construction → Risk Management → Execution
 ```
 
 | Module | Description |
 |--------|-------------|
-| `data/` | Financial Datasets API client and caching layer |
+| `data/` | Data clients behind the `DataClient` protocol — `internal` (default: shared quantai-market-data warehouse, split-asof prices, yfinance analyst estimates) and `fd` (Financial Datasets API). Select via `DATA_PROVIDER` env or `make_client(provider)` |
 | `event_study/` | Event study framework — CARs, market model, significance testing |
 | `signals/` | Quantitative signal generation (`BaseSignal` ABC with `[-1, +1]` output) |
 | `features/` | Feature engineering — earnings surprise, KPI momentum, cross-sector lead-lag |
@@ -28,7 +28,7 @@ Data (FD API) → Signals → Features → Portfolio Construction → Risk Manag
 - **Costs from day one.** Every backtest includes a transaction cost model. No frictionless fantasies.
 - **Validation built in.** CPCV and PBO are first-class citizens, not afterthoughts. If a signal can't survive combinatorial purged validation, it doesn't ship.
 - **Point-in-time by construction.** The data layer enforces that no future information leaks into historical analysis.
-- **Daily frequency.** Built for daily-bar strategies on US equities using [Financial Datasets](https://financialdatasets.ai) as the sole data provider.
+- **Daily frequency.** Built for daily-bar strategies on US equities. The default `internal` provider reads the suite's quantai-market-data warehouse (Polygon-backed prices on the point-in-time `split_asof` basis; earnings announcements with analyst estimates via yfinance); [Financial Datasets](https://financialdatasets.ai) remains available with `DATA_PROVIDER=fd` and an API key.
 
 ## Data Models
 

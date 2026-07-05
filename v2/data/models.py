@@ -159,6 +159,7 @@ class CompanyFacts(BaseModel):
     ticker: str
     is_active: bool = True
     name: str | None = None
+    market_cap: float | None = None
     cik: str | None = None
     sector: str | None = None
     industry: str | None = None

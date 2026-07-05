@@ -1,8 +1,8 @@
 """Week 1 data exploration — pull and inspect FD data for 5 tickers."""
 
-import os
 import pytest
 
+from v2.conftest import has_fd_key
 from v2.data import FDClient
 
 TICKERS = ["AAPL", "MSFT", "NVDA", "JPM", "XOM"]
@@ -10,8 +10,8 @@ PRICE_START = "2024-01-01"
 PRICE_END = "2026-04-15"
 
 pytestmark = pytest.mark.skipif(
-    not os.environ.get("FINANCIAL_DATASETS_API_KEY"),
-    reason="live Financial Datasets smoke tests require FINANCIAL_DATASETS_API_KEY",
+    not has_fd_key(),
+    reason="live Financial Datasets smoke tests require a real FINANCIAL_DATASETS_API_KEY",
 )
 
 

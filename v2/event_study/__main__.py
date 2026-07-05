@@ -1,14 +1,15 @@
 """Run the event study engine. Screen-record friendly output.
 
-Usage: poetry run python -m v2.event_study
+Usage: python -m v2.event_study [--provider internal|fd] [--tickers AAPL MSFT ...]
 """
 
 from __future__ import annotations
 
+import argparse
 import sys
 import time
 
-from v2.data import FDClient
+from v2.data import make_client
 from v2.event_study import compute_car
 
 
@@ -78,19 +79,26 @@ def color_eps(s: str | None) -> str:
 def main() -> None:
     import logging
     logging.getLogger("v2.data.client").setLevel(logging.ERROR)
+    logging.getLogger("v2.data.internal").setLevel(logging.ERROR)
 
-    n = len(TICKERS)
+    parser = argparse.ArgumentParser(prog="v2.event_study", description="PEAD event study")
+    parser.add_argument("--provider", choices=["internal", "fd"], default=None, help="data provider (default: DATA_PROVIDER env, then internal)")
+    parser.add_argument("--tickers", nargs="+", default=TICKERS, metavar="TICKER")
+    args = parser.parse_args()
+
+    tickers = [t.upper() for t in args.tickers]
+    n = len(tickers)
 
     # Fetch with progress
     progress(f"Fetching data... [0/{n}]")
-    with FDClient() as fd:
+    with make_client(args.provider) as fd:
         from datetime import date
         spy_prices = fd.get_prices("SPY", "2023-01-01", date.today().isoformat())
         spy_closes = {p.time[:10]: p.close for p in spy_prices}
 
         from v2.event_study.engine import _compute_ticker_events
         all_events = []
-        for i, ticker in enumerate(TICKERS):
+        for i, ticker in enumerate(tickers):
             progress(f"Fetching data... [{i + 1}/{n}] {ticker}")
             events = _compute_ticker_events(ticker, fd, spy_closes, earnings_limit=EARNINGS_LIMIT)
             all_events.extend(events)

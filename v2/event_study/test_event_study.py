@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import os
 
 import numpy as np
 import pytest
@@ -176,16 +175,18 @@ class TestPlots:
 # Integration tests — require API key
 # ---------------------------------------------------------------------------
 
+from v2.conftest import has_warehouse
+
 pytestmark_live = pytest.mark.skipif(
-    not os.environ.get("FINANCIAL_DATASETS_API_KEY"),
-    reason="live tests require FINANCIAL_DATASETS_API_KEY",
+    not has_warehouse(),
+    reason="live tests require QUANTAI_MARKETDATA_DB_URL (internal provider)",
 )
 
 
 @pytest.fixture(scope="module")
 def fd():
-    from v2.data import FDClient
-    with FDClient() as client:
+    from v2.data import make_client
+    with make_client() as client:
         yield client
 
 

@@ -1,16 +1,18 @@
 """Run the PEAD backtester. Screen-record friendly output.
 
-Usage: poetry run python -m v2.backtesting
+Usage: python -m v2.backtesting [--provider internal|fd] [--tickers AAPL MSFT ...]
+                                [--start YYYY-MM-DD] [--end YYYY-MM-DD]
 """
 
 from __future__ import annotations
 
+import argparse
 import os
 import sys
 import time
 from datetime import date
 
-from v2.data import FDClient
+from v2.data import make_client
 from v2.backtesting import BacktestEngine
 from v2.signals import PEADModel
 
@@ -124,8 +126,17 @@ def print_trade_row(t):
 def main() -> None:
     import logging
     logging.getLogger("v2.data.client").setLevel(logging.ERROR)
+    logging.getLogger("v2.data.internal").setLevel(logging.ERROR)
 
-    n = len(TICKERS)
+    parser = argparse.ArgumentParser(prog="v2.backtesting", description="PEAD backtest")
+    parser.add_argument("--provider", choices=["internal", "fd"], default=None, help="data provider (default: DATA_PROVIDER env, then internal)")
+    parser.add_argument("--tickers", nargs="+", default=TICKERS, metavar="TICKER")
+    parser.add_argument("--start", default=START_DATE)
+    parser.add_argument("--end", default=END_DATE)
+    args = parser.parse_args()
+
+    tickers = [t.upper() for t in args.tickers]
+    n = len(tickers)
     engine = BacktestEngine(capital=CAPITAL, per_trade=PER_TRADE)
     model = PEADModel()
 
@@ -134,12 +145,12 @@ def main() -> None:
     sys.stdout.flush()
 
     trades = []
-    with FDClient() as fd:
-        for i, ticker in enumerate(TICKERS):
+    with make_client(args.provider) as fd:
+        for i, ticker in enumerate(tickers):
             sys.stdout.write(f"\r  Backtesting PEAD alpha... [{i + 1}/{n}] {ticker:<6}")
             sys.stdout.flush()
             r = engine.run_alpha(
-                model, [ticker], fd, START_DATE, END_DATE, holding_days=HOLDING_DAYS,
+                model, [ticker], fd, args.start, args.end, holding_days=HOLDING_DAYS,
             )
             trades.extend(r.trades)
 
