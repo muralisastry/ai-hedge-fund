@@ -31,7 +31,7 @@ from datetime import date, datetime, timedelta
 
 import numpy as np
 
-from v2.data.client import FDClient
+from v2.data.protocol import DataClient
 from v2.data.models import EarningsRecord
 from v2.event_study.models import (
     AggregateResult,
@@ -67,12 +67,13 @@ _CAR_WINDOWS = [(0, 1), (0, 5), (0, 20)]  # the three event windows we compute C
 
 def compute_car(
     tickers: list[str],
-    fd_client: FDClient,
+    fd_client: DataClient,
     *,
     earnings_limit: int = 12,
     market_ticker: str = _MARKET_TICKER,
     n_bootstrap: int = 10_000,
     rng_seed: int | None = None,
+    require_eps_surprise: bool = False,
 ) -> EventStudyResult:
     """Compute CARs for earnings events across multiple tickers.
 
@@ -82,12 +83,13 @@ def compute_car(
     3. Aggregates results cross-sectionally by source_type.
 
     Args:
-        tickers:         List of stock ticker symbols.
-        fd_client:       FDClient instance (manages API auth + retries).
-        earnings_limit:  Max earnings periods to fetch per ticker.
-        market_ticker:   Market benchmark ticker (default "SPY").
-        n_bootstrap:     Number of bootstrap resamples for CIs.
-        rng_seed:        Seed for bootstrap reproducibility (None = random).
+        tickers:              List of stock ticker symbols.
+        fd_client:            Data provider (any DataClient; FDClient in production).
+        earnings_limit:       Max earnings periods to fetch per ticker.
+        market_ticker:        Market benchmark ticker (default "SPY").
+        n_bootstrap:          Number of bootstrap resamples for CIs.
+        rng_seed:             Seed for bootstrap reproducibility (None = random).
+        require_eps_surprise: If True, only include events with BEAT/MISS/MEET label.
 
     Returns:
         EventStudyResult with per-event CARs, aggregate stats, and skipped tickers.
@@ -116,6 +118,10 @@ def compute_car(
         else:
             skipped.append(ticker)
 
+    # Drop events without EPS surprise labels if requested
+    if require_eps_surprise:
+        all_events = [e for e in all_events if e.eps_surprise is not None]
+
     # Cross-sectional aggregation: mean CAR, t-test, bootstrap CI, by source_type
     aggregates = _aggregate(all_events, n_bootstrap, rng_seed)
 
@@ -130,7 +136,7 @@ def compute_car(
 
 def _compute_ticker_events(
     ticker: str,
-    fd_client: FDClient,
+    fd_client: DataClient,
     spy_closes: dict[str, float],
     *,
     earnings_limit: int = 12,

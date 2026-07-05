@@ -47,6 +47,11 @@ class FinancialMetrics(BaseModel):
     period: str
     currency: str | None = None
 
+    # Point-in-time filing metadata (Eastern Time) — when this data became
+    # public. Null on rows without a dated SEC filing (deep-history archive).
+    filing_date: str | None = None
+    filing_datetime: str | None = None
+
     # Valuation
     market_cap: float | None = None
     enterprise_value: float | None = None
@@ -239,7 +244,7 @@ class EarningsRecord(BaseModel):
     ticker: str
     report_period: str
     source_type: str
-    filing_date: str
+    filing_date: str | None = None
     filing_datetime: str | None = None
     filing_window: str | None = None
     fiscal_period: str | None = None

@@ -1,6 +1,6 @@
 [project]
 name = "ai-hedge-fund"
-version = "2026.5.9"
+version = "2026.7.3"
 description = "An AI-powered hedge fund that uses multiple agents to make trading decisions"
 readme = "README.md"
 requires-python = ">=3.11"
