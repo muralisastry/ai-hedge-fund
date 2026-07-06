@@ -28,7 +28,7 @@ Data (internal warehouse / FD API) → Signals → Features → Portfolio Constr
 - **Costs from day one.** Every backtest includes a transaction cost model. No frictionless fantasies.
 - **Validation built in.** CPCV and PBO are first-class citizens, not afterthoughts. If a signal can't survive combinatorial purged validation, it doesn't ship.
 - **Point-in-time by construction.** The data layer enforces that no future information leaks into historical analysis.
-- **Daily frequency.** Built for daily-bar strategies on US equities. The default `internal` provider reads the suite's quantai-market-data warehouse (Polygon-backed prices on the point-in-time `split_asof` basis; earnings announcements with analyst estimates via yfinance); [Financial Datasets](https://financialdatasets.ai) remains available with `DATA_PROVIDER=fd` and an API key.
+- **Daily frequency.** Built for daily-bar strategies on US equities. The default `internal` provider reads the suite's quantai-market-data warehouse (Polygon-backed prices on the point-in-time `split_asof` basis; earnings announcements with analyst estimates via yfinance; dividends credited as cash per trade for total-return accounting); [Financial Datasets](https://financialdatasets.ai) remains available with `DATA_PROVIDER=fd` and an API key.
 
 ## Data Models
 

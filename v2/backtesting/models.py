@@ -11,16 +11,17 @@ class Trade(BaseModel):
     """A single completed trade — one entry and one exit."""
 
     ticker: str
-    direction: str                    # "long" or "short"
-    entry_date: str                   # YYYY-MM-DD
-    exit_date: str                    # YYYY-MM-DD
+    direction: str  # "long" or "short"
+    entry_date: str  # YYYY-MM-DD
+    exit_date: str  # YYYY-MM-DD
     entry_price: float
     exit_price: float
     shares: float
-    pnl: float                        # dollar profit/loss
-    return_pct: float                 # percentage return (signed)
-    holding_days: int                 # trading days held
-    reasoning: str | None = None      # why the alpha model opened this (from the Signal)
+    pnl: float  # dollar profit/loss (incl. dividends)
+    return_pct: float  # percentage return (signed, incl. dividends)
+    dividends: float = 0.0  # dividend cash component of pnl (negative for shorts)
+    holding_days: int  # trading days held
+    reasoning: str | None = None  # why the alpha model opened this (from the Signal)
     metadata: dict[str, Any] = Field(default_factory=dict)  # alpha-model context
 
 
@@ -31,7 +32,7 @@ class PerformanceMetrics(BaseModel):
     annualized_return_pct: float
     sharpe_ratio: float
     max_drawdown_pct: float
-    win_rate: float                   # fraction of trades with positive return
+    win_rate: float  # fraction of trades with positive return
     n_trades: int
     n_long: int
     n_short: int

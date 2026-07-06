@@ -106,6 +106,31 @@ class InternalClient:
             )
         return out
 
+    def get_dividends(self, ticker: str, start_date: str, end_date: str) -> list[dict]:
+        """Cash dividends with ex_date in [start_date, end_date], ascending.
+
+        Returns ``[{"ex_date": "YYYY-MM-DD", "cash_amount": float}, ...]`` with
+        cash scaled onto the same split_asof basis as get_prices (a $1/share
+        dividend paid before a 10:1 split is $0.10 per adjusted share).
+
+        Internal-provider extension — NOT part of the DataClient protocol
+        (FD has no dividends endpoint); consumers feature-detect via hasattr.
+        """
+        start = date.fromisoformat(start_date[:10])
+        end = date.fromisoformat(end_date[:10])
+        try:
+            from quantai_market_data.adjustment import split_factors, splits_from_rows
+            from quantai_market_data.store import read_dividends, read_splits
+
+            rows = read_dividends(ticker.upper(), start=start, end=end)
+            if not rows:
+                return []
+            splits = splits_from_rows(read_splits(ticker.upper()))
+            factors = split_factors([r["ex_date"] for r in rows], splits, asof=end)
+        except Exception as exc:
+            raise InternalClientError(f"get_dividends({ticker}) failed: {exc}", operation="get_dividends") from exc
+        return [{"ex_date": str(r["ex_date"])[:10], "cash_amount": float(r["cash_amount"]) * float(f)} for r, f in zip(rows, factors) if r.get("cash_amount")]
+
     # ------------------------------------------------------------------
     # Earnings (announcements + analyst estimates)
     # ------------------------------------------------------------------

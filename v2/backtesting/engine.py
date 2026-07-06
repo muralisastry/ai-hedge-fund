@@ -78,10 +78,17 @@ class BacktestEngine:
         """
         trades: list[Trade] = []
         for ticker in tickers:
-            trades.extend(self._trade_ticker(
-                model, ticker, fd_client, start_date, end_date,
-                threshold=threshold, holding_days=holding_days,
-            ))
+            trades.extend(
+                self._trade_ticker(
+                    model,
+                    ticker,
+                    fd_client,
+                    start_date,
+                    end_date,
+                    threshold=threshold,
+                    holding_days=holding_days,
+                )
+            )
 
         if not trades:
             return BacktestResult()
@@ -118,6 +125,13 @@ class BacktestEngine:
         if not prices:
             return []
 
+        # Dividends-as-cash: split_asof prices exclude dividends by design,
+        # so credit them separately. Optional provider capability (FD lacks it).
+        if hasattr(fd_client, "get_dividends"):
+            dividend_map = {d["ex_date"]: d["cash_amount"] for d in fd_client.get_dividends(ticker, start_date, end_padded)}
+        else:
+            dividend_map = {}
+
         price_map = {p.time[:10]: p.close for p in prices}
         all_days = sorted(price_map)
         # Scan grid = trading days within [start_date, end_date]
@@ -137,8 +151,15 @@ class BacktestEngine:
                 if exit_idx >= len(all_days):
                     break  # not enough future data to close the position
                 trade = self._build_trade(
-                    ticker, direction, d, all_days[exit_idx],
-                    price_map, holding_days, signal.reasoning, dict(signal.metadata),
+                    ticker,
+                    direction,
+                    d,
+                    all_days[exit_idx],
+                    price_map,
+                    dividend_map,
+                    holding_days,
+                    signal.reasoning,
+                    dict(signal.metadata),
                 )
                 if trade is not None:
                     trades.append(trade)
@@ -165,24 +186,34 @@ class BacktestEngine:
         entry_date: str,
         exit_date: str,
         price_map: dict[str, float],
+        dividend_map: dict[str, float],
         holding_days: int,
         reasoning: str | None,
         metadata: dict,
     ) -> Trade | None:
-        """Fill a position at entry/exit closes with equal-dollar sizing."""
+        """Fill a position at entry/exit closes with equal-dollar sizing.
+
+        Dividends are credited as cash on the ex-date while held: interval
+        (entry_date, exit_date] — an entry-day ex-date is not collected, an
+        exit-day one is (mirrors the suite backtester's replay semantics).
+        Longs are credited, shorts are debited.
+        """
         entry_price = price_map.get(entry_date)
         exit_price = price_map.get(exit_date)
         if entry_price is None or exit_price is None or entry_price <= 0:
             return None
 
         shares = self._per_trade / entry_price
+        per_share_divs = sum(cash for ex, cash in dividend_map.items() if entry_date < ex <= exit_date)
 
         if direction == "long":
-            pnl = shares * (exit_price - entry_price)
-            return_pct = (exit_price - entry_price) / entry_price
+            pnl = shares * (exit_price - entry_price + per_share_divs)
+            return_pct = (exit_price - entry_price + per_share_divs) / entry_price
+            dividends = shares * per_share_divs
         else:
-            pnl = shares * (entry_price - exit_price)
-            return_pct = (entry_price - exit_price) / entry_price
+            pnl = shares * (entry_price - exit_price - per_share_divs)
+            return_pct = (entry_price - exit_price - per_share_divs) / entry_price
+            dividends = -shares * per_share_divs
 
         return Trade(
             ticker=ticker,
@@ -194,6 +225,7 @@ class BacktestEngine:
             shares=round(shares, 4),
             pnl=round(pnl, 2),
             return_pct=round(return_pct, 6),
+            dividends=round(dividends, 2),
             holding_days=holding_days,
             reasoning=reasoning,
             metadata=metadata,
@@ -294,6 +326,7 @@ class BacktestEngine:
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
 
 def _parse_date(s: str) -> date:
     return datetime.strptime(s[:10], "%Y-%m-%d").date()
