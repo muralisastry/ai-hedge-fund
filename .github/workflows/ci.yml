@@ -1,0 +1,38 @@
+name: CI
+
+# CI for this fork of virattt/ai-hedge-fund. Scoped to the offline `tests/` (src)
+# suite: it fakes the `quantai_market_data` provider via sys.modules and needs no
+# DB, keys, or network. The `v2/` suite is excluded here because it top-imports the
+# private `quantai_market_data` sibling (a collection error without it) — covering
+# v2/ would need that private package checked out (cross-repo auth), deferred.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Install uv
+        # Pinned, pip-based (pipx preinstalled): no Node action, no curl|sh.
+        run: |
+          pipx install uv==0.11.15
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+
+      - name: Create venv + install (py3.12; pyproject requires >=3.11)
+        run: |
+          uv venv --python 3.12
+          uv pip install -e ".[dev]"
+
+      - name: Test (offline src suite; v2/ deferred — needs the private sibling)
+        run: uv run pytest tests/ -q
