@@ -12,6 +12,15 @@ interface TopBarProps {
   onSettingsClick: () => void;
 }
 
+// The suite link (MarketSurge, :5176) on whichever host this page came from —
+// localhost here, the *.ts.net name from a tailnet device (`qt serve up`).
+// Same rule as the QuantAI design system's rehost.js.
+const suiteUrl = ["localhost", "127.0.0.1", "[::1]", "::1"].includes(
+  window.location.hostname.toLowerCase(),
+)
+  ? "http://localhost:5176"
+  : `${window.location.protocol}//${window.location.hostname}:5176`;
+
 export function TopBar({
   isLeftCollapsed,
   isRightCollapsed,
@@ -25,7 +34,7 @@ export function TopBar({
     <div className="absolute top-0 right-0 z-40 flex items-center gap-0 py-1 px-2 bg-panel/80">
       {/* Link back to the QuantAI Trading Suite (local integration) */}
       <a
-        href="http://localhost:5176"
+        href={suiteUrl}
         className="text-xs text-muted-foreground hover:text-foreground px-2 whitespace-nowrap transition-colors"
         title="QuantAI Trading Suite"
       >
